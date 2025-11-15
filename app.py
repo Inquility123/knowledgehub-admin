@@ -4,8 +4,8 @@ import os
 
 app = Flask(__name__)
 
-# Backend API URL (Azure backend)
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://kh-api-app.azurewebsites.net")
+# URL van jouw ECHTE backend
+BACKEND_URL = os.environ.get("BACKEND_URL", "https://kh-backend.azurewebsites.net")
 
 
 @app.route("/")
@@ -16,15 +16,14 @@ def index():
 @app.route("/dashboard")
 def dashboard():
     try:
-        # Call backend API
-        r = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20", timeout=5)
-        data = r.json()
+        response = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
+        measurements = response.json()
     except Exception as e:
-        print("API ERROR:", e)
-        data = []
+        print("BACKEND ERROR:", e)
+        measurements = []
 
-    return render_template("dashboard.html", measurements=data)
+    return render_template("dashboard.html", measurements=measurements)
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run()
