@@ -11,59 +11,32 @@
         <div class="login-card">
             <h1 class="login-title">The Knowledge Hub</h1>
             <p class="login-subtitle">Monitoring Dashboard</p>
-            
-            <form class="login-form" action="/dashboard" method="get">
-                <div class="form-group">
-                    <label for="username" class="form-label">Username or Email</label>
-                    <input 
-                        type="text" 
-                        id="username" 
-                        name="username" 
-                        class="form-input" 
-                        placeholder="Enter your username or email"
-                        autocomplete="username"
-                        required
-                    >
-                </div>
-                
-                <div class="form-group">
-                    <label for="password" class="form-label">Password</label>
-                    <input 
-                        type="password" 
-                        id="password" 
-                        name="password" 
-                        class="form-input" 
-                        placeholder="Enter your password"
-                        autocomplete="current-password"
-                        required
-                    >
-                </div>
-                
-                <button type="submit" class="btn btn-primary login-button">
-                    Login
-                </button>
-            </form>
-            
+
+            <!-- Microsoft Entra ID Login Button -->
+            <div class="login-form">
+                <a href="{{ url_for('login') }}" class="btn btn-primary login-button">
+                    Inloggen met Microsoft Entra ID
+                </a>
+            </div>
+
             <!-- Logo Row -->
             <div class="logo-row">
-<img src="{{ url_for('static', filename='images/knowledgehub_logo.png') }}"
-     alt="Knowledge Hub Logo"
-     class="footer-logo footer-logo-kh">
 
-<img src="{{ url_for('static', filename='images/fontys_logo.png') }}"
-     alt="Fontys University Logo"
-     class="footer-logo">
+                <img src="{{ url_for('static', filename='images/knowledgehub_logo.png') }}"
+                    alt="Knowledge Hub Logo"
+                    class="footer-logo footer-logo-kh">
+
+                <img src="{{ url_for('static', filename='images/fontys_logo.png') }}"
+                    alt="Fontys University Logo"
+                    class="footer-logo">
 
             </div>
         </div>
     </div>
-    
+
     <!-- Signature -->
-    <div class="page-signature">Laurens — Student, Fontys Hogeschool</div>
-    
+    <div class="page-signature">Laurens — Student at Fontys University of Applied Sciences</div>
+
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
-
-
-
