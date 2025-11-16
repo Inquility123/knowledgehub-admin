@@ -1,27 +1,32 @@
 from flask import Flask, render_template, redirect, url_for, session, request
+from flask_session import Session
 from authlib.integrations.flask_client import OAuth
 from functools import wraps
 import requests
 import os
 
-
 app = Flask(__name__)
 
+# --------------------------------------------------------------------
+# Session configuration (fix for Azure App Service)
+# --------------------------------------------------------------------
 
-# ---------------------------------------------------------------------
-# Secret key (required for session functionality)
-# ---------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    raise Exception("SECRET_KEY environment variable is missing")
+    raise Exception("SECRET_KEY environment variable missing")
 
 app.secret_key = SECRET_KEY
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = "/home/site/wwwroot/.flask_session"
+app.config["SESSION_PERMANENT"] = False
 
+Session(app)
 
-# ---------------------------------------------------------------------
-# App configuration
-# ---------------------------------------------------------------------
-BACKEND_URL = os.getenv("BACKEND_URL")
+# --------------------------------------------------------------------
+# Azure AD configuration
+# --------------------------------------------------------------------
+
+BACKEND_URL = os.getenv("BACKEND_URL", "https://kh-api-app.azurewebsites.net")
 
 TENANT_ID = os.getenv("AAD_TENANT_ID")
 CLIENT_ID = os.getenv("AAD_CLIENT_ID")
@@ -31,11 +36,8 @@ REDIRECT_URI = os.getenv("AAD_REDIRECT_URI")
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 DISCOVERY_URL = f"{AUTHORITY}/v2.0/.well-known/openid-configuration"
 
-
-# ---------------------------------------------------------------------
-# OAuth Setup
-# ---------------------------------------------------------------------
 oauth = OAuth(app)
+
 azure = oauth.register(
     name="azure",
     client_id=CLIENT_ID,
@@ -44,23 +46,23 @@ azure = oauth.register(
     client_kwargs={"scope": "openid profile email"},
 )
 
+# --------------------------------------------------------------------
+# Helpers
+# --------------------------------------------------------------------
 
-# ---------------------------------------------------------------------
-# Login decorator
-# ---------------------------------------------------------------------
-def login_required(func):
-    @wraps(func)
+def login_required(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
         if "user" not in session:
             return redirect(url_for("index"))
-        return func(*args, **kwargs)
-
+        return f(*args, **kwargs)
     return wrapper
 
 
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------
 # Routes
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------
+
 @app.route("/")
 def index():
     if "user" in session:
@@ -77,12 +79,13 @@ def login():
 def auth_callback():
     try:
         token = azure.authorize_access_token()
-    except Exception as exc:
-        return f"OAuth callback error: {exc}", 500
+    except Exception as e:
+        return f"OAuth callback error: {str(e)}", 400
 
     userinfo = token.get("userinfo") or token.get("id_token_claims")
+
     if not userinfo:
-        return "Login failed: No user info returned", 400
+        return "Login failed: no user info received", 400
 
     session["user"] = {
         "name": userinfo.get("name"),
@@ -102,18 +105,15 @@ def logout():
 @login_required
 def dashboard():
     try:
-        response = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
-        data = response.json()
+        resp = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
+        data = resp.json()
     except Exception:
         data = []
 
-    return render_template("dashboard.html",
-                           measurements=data,
-                           user=session["user"])
+    return render_template("dashboard.html", measurements=data, user=session["user"])
 
 
-# ---------------------------------------------------------------------
-# Run (local)
-# ---------------------------------------------------------------------
+# --------------------------------------------------------------------
+
 if __name__ == "__main__":
     app.run(debug=True)
