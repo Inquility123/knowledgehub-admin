@@ -4,51 +4,63 @@ from functools import wraps
 import requests
 import os
 
+
 app = Flask(__name__)
 
-# Secret key for sessions
-app.secret_key = os.getenv("SECRET_KEY", "dev")
 
-# Backend API URL
+# ---------------------------------------------------------------------
+# Secret key (required for session functionality)
+# ---------------------------------------------------------------------
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise Exception("SECRET_KEY environment variable is missing")
+
+app.secret_key = SECRET_KEY
+
+
+# ---------------------------------------------------------------------
+# App configuration
+# ---------------------------------------------------------------------
 BACKEND_URL = os.getenv("BACKEND_URL")
 
-# Azure AD config
 TENANT_ID = os.getenv("AAD_TENANT_ID")
 CLIENT_ID = os.getenv("AAD_CLIENT_ID")
 CLIENT_SECRET = os.getenv("AAD_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("AAD_REDIRECT_URI")
 
-# Azure AD endpoints
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 DISCOVERY_URL = f"{AUTHORITY}/v2.0/.well-known/openid-configuration"
 
-# OAuth setup
+
+# ---------------------------------------------------------------------
+# OAuth Setup
+# ---------------------------------------------------------------------
 oauth = OAuth(app)
 azure = oauth.register(
     name="azure",
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     server_metadata_url=DISCOVERY_URL,
-    client_kwargs={
-        "scope": "openid profile email https://graph.microsoft.com/.default"
-    },
+    client_kwargs={"scope": "openid profile email"},
 )
 
 
-# Login required decorator
-def login_required(f):
-    @wraps(f)
+# ---------------------------------------------------------------------
+# Login decorator
+# ---------------------------------------------------------------------
+def login_required(func):
+    @wraps(func)
     def wrapper(*args, **kwargs):
         if "user" not in session:
             return redirect(url_for("index"))
-        return f(*args, **kwargs)
+        return func(*args, **kwargs)
+
     return wrapper
 
 
-# -----------------------
-# ROUTES
-# -----------------------
-
+# ---------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------
 @app.route("/")
 def index():
     if "user" in session:
@@ -58,25 +70,23 @@ def index():
 
 @app.route("/login")
 def login():
-    return azure.authorize_redirect(REDIRECT_URI)
+    return azure.authorize_redirect(redirect_uri=REDIRECT_URI)
 
 
 @app.route("/auth/callback")
 def auth_callback():
-    # Tokens ophalen
-    token = azure.authorize_access_token()
+    try:
+        token = azure.authorize_access_token()
+    except Exception as exc:
+        return f"OAuth callback error: {exc}", 500
 
-    # Userinfo via Microsoft Graph OIDC
-    resp = oauth.azure.get(
-        "https://graph.microsoft.com/oidc/userinfo",
-        token=token
-    )
-    userinfo = resp.json()
+    userinfo = token.get("userinfo") or token.get("id_token_claims")
+    if not userinfo:
+        return "Login failed: No user info returned", 400
 
-    # User opslaan in session
     session["user"] = {
         "name": userinfo.get("name"),
-        "email": userinfo.get("email") or userinfo.get("preferred_username")
+        "email": userinfo.get("preferred_username"),
     }
 
     return redirect(url_for("dashboard"))
@@ -92,22 +102,18 @@ def logout():
 @login_required
 def dashboard():
     try:
-        r = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
-        data = r.json()
-    except Exception as e:
-        print("Backend error:", e)
+        response = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
+        data = response.json()
+    except Exception:
         data = []
 
-    return render_template(
-        "dashboard.html",
-        measurements=data,
-        user=session["user"]
-    )
+    return render_template("dashboard.html",
+                           measurements=data,
+                           user=session["user"])
 
 
-# -----------------------
-# APP RUN
-# -----------------------
-
+# ---------------------------------------------------------------------
+# Run (local)
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(debug=True)
