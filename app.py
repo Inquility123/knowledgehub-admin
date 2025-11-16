@@ -6,31 +6,36 @@ import os
 
 app = Flask(__name__)
 
-# Secret key for signing session cookies
-app.secret_key = os.environ.get("SECRET_KEY", "development")
+# Secret key for sessions
+app.secret_key = os.getenv("SECRET_KEY", "dev")
 
 # Backend API URL
-BACKEND_URL = os.environ.get("BACKEND_URL", "https://kh-api-app.azurewebsites.net")
+BACKEND_URL = os.getenv("BACKEND_URL")
 
 # Azure AD config
-TENANT_ID = os.environ.get("AAD_TENANT_ID")
-CLIENT_ID = os.environ.get("AAD_CLIENT_ID")
-CLIENT_SECRET = os.environ.get("AAD_CLIENT_SECRET")
-REDIRECT_URI = os.environ.get("AAD_REDIRECT_URI")
+TENANT_ID = os.getenv("AAD_TENANT_ID")
+CLIENT_ID = os.getenv("AAD_CLIENT_ID")
+CLIENT_SECRET = os.getenv("AAD_CLIENT_SECRET")
+REDIRECT_URI = os.getenv("AAD_REDIRECT_URI")
 
+# Azure AD endpoints
 AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 DISCOVERY_URL = f"{AUTHORITY}/v2.0/.well-known/openid-configuration"
 
+# OAuth setup
 oauth = OAuth(app)
 azure = oauth.register(
     name="azure",
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     server_metadata_url=DISCOVERY_URL,
-    client_kwargs={"scope": "openid profile email"},
+    client_kwargs={
+        "scope": "openid profile email https://graph.microsoft.com/.default"
+    },
 )
 
 
+# Login required decorator
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -39,6 +44,10 @@ def login_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+
+# -----------------------
+# ROUTES
+# -----------------------
 
 @app.route("/")
 def index():
@@ -54,16 +63,22 @@ def login():
 
 @app.route("/auth/callback")
 def auth_callback():
+    # Tokens ophalen
     token = azure.authorize_access_token()
-    userinfo = token.get("userinfo") or token.get("id_token_claims")
 
-    if not userinfo:
-        return "Login failed: no user info", 400
+    # Userinfo via Microsoft Graph OIDC
+    resp = oauth.azure.get(
+        "https://graph.microsoft.com/oidc/userinfo",
+        token=token
+    )
+    userinfo = resp.json()
 
+    # User opslaan in session
     session["user"] = {
         "name": userinfo.get("name"),
-        "email": userinfo.get("preferred_username"),
+        "email": userinfo.get("email") or userinfo.get("preferred_username")
     }
+
     return redirect(url_for("dashboard"))
 
 
@@ -79,11 +94,20 @@ def dashboard():
     try:
         r = requests.get(f"{BACKEND_URL}/api/measurements/recent?limit=20")
         data = r.json()
-    except:
+    except Exception as e:
+        print("Backend error:", e)
         data = []
 
-    return render_template("dashboard.html", measurements=data, user=session["user"])
+    return render_template(
+        "dashboard.html",
+        measurements=data,
+        user=session["user"]
+    )
 
+
+# -----------------------
+# APP RUN
+# -----------------------
 
 if __name__ == "__main__":
     app.run(debug=True)
