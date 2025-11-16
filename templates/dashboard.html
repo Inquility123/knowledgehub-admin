@@ -8,45 +8,66 @@
 </head>
 <body>
     <div class="dashboard-container">
-        <div class="dashboard-header">
-            <h1 class="dashboard-title">System Measurements</h1>
-            <p class="dashboard-subtitle">Real-time monitoring data from The Knowledge Hub</p>
+
+        <!-- HEADER MET USER INFO -->
+        <div class="dashboard-header" style="display:flex; justify-content:space-between; align-items:center;">
+
+            <div>
+                <h1 class="dashboard-title">System Measurements</h1>
+                <p class="dashboard-subtitle">Real-time monitoring data from The Knowledge Hub</p>
+            </div>
+
+            {% if user %}
+            <div style="text-align:right; font-size:0.9rem; color:white;">
+                <div><strong>{{ user.name }}</strong></div>
+                <div style="opacity:0.7;">{{ user.email }}</div>
+
+                <a href="{{ url_for('logout') }}" 
+                   class="btn" 
+                   style="padding:0.4rem 1rem; margin-top:0.5rem;">
+                    Logout
+                </a>
+            </div>
+            {% endif %}
+
         </div>
 
+        <!-- TABEL MET DATA -->
         {% if measurements %}
-            <div class="data-table-container glass-card">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Hostname</th>
-                            <th>IP Address</th>
-                            <th>CPU %</th>
-                            <th>RAM %</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in measurements %}
-                            <tr>
-                                <td>{{ row.timestamp_utc }}</td>
-                                <td>{{ row.hostname }}</td>
-                                <td>{{ row.ip_address }}</td>
-                                <td>{{ row.cpu_percent }}%</td>
-                                <td>{{ row.ram_percent }}%</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+        <div class="data-table-container glass-card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Hostname</th>
+                        <th>IP Address</th>
+                        <th>CPU %</th>
+                        <th>RAM %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in measurements %}
+                    <tr>
+                        <td>{{ row.timestamp_utc }}</td>
+                        <td>{{ row.hostname }}</td>
+                        <td>{{ row.ip_address }}</td>
+                        <td>{{ row.cpu_percent }}%</td>
+                        <td>{{ row.ram_percent }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
         {% else %}
-            <div class="glass-card empty-state">
-                <div class="empty-state-icon">📊</div>
-                <h3>No Data Available</h3>
-                <p>No measurement data is currently available from the backend.</p>
-                <a href="/" class="btn mt-3">Back to Login</a>
-            </div>
+        <div class="glass-card empty-state">
+            <div class="empty-state-icon">📊</div>
+            <h3>No Data Available</h3>
+            <p>No measurement data is currently available from the backend.</p>
+            <a href="/" class="btn mt-3">Back to Login</a>
+        </div>
         {% endif %}
 
+        <!-- BACK BUTTON -->
         <div class="text-center mt-4">
             <a href="/" class="nav-link">
                 ← Back to Home
@@ -55,7 +76,7 @@
     </div>
     
     <!-- Signature -->
-    <div class="page-signature">Laurens — Student, Fontys Hogeschool</div>
+    <div class="page-signature">Laurens — Student at Fontys University of Applied Sciences</div>
     
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
